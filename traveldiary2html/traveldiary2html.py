@@ -3,7 +3,6 @@
 """
 
 from docutils.readers.standalone import Reader as Standalone
-from docutils import frontend
 from .utils import export
 from json import loads, JSONDecodeError
 
@@ -12,32 +11,12 @@ from json import loads, JSONDecodeError
 class Reader(Standalone):
     """Standalone reader adding support for variable substitution at runtime"""
 
-    settings_spec = (
-        'Variable-substituting Reader',
-        None,
-        (('Disable the promotion of a lone top-level section title to '
-          'document title (and subsequent section title to document '
-          'subtitle promotion; enabled by default).',
-          ['--no-doc-title'],
-          {'dest': 'doctitle_xform', 'action': 'store_false', 'default': 1,
-           'validator': frontend.validate_boolean}),
-         ('Disable the bibliographic field list transform (enabled by '
-          'default).',
-          ['--no-doc-info'],
-          {'dest': 'docinfo_xform', 'action': 'store_false', 'default': 1,
-           'validator': frontend.validate_boolean}),
-         ('Activate the promotion of lone subsection titles to '
-          'section subtitles (disabled by default).',
-          ['--section-subtitles'],
-          {'dest': 'sectsubtitle_xform', 'action': 'store_true', 'default': 0,
-           'validator': frontend.validate_boolean}),
-         ('Deactivate the promotion of lone subsection titles.',
-          ['--no-section-subtitles'],
-          {'dest': 'sectsubtitle_xform', 'action': 'store_false'}),
-         ('Define variable substitutions as a JSON dictionary.',
-          ['--subst'],
-          {'type': str, 'default': "{}", 'dest': 'varsubst'}),
-         ))
+    settings_spec = Standalone.settings_spec[0:2] + (
+                        Standalone.settings_spec[2] +
+                        (('Define variable substitutions as a JSON dictionary',
+                          ['--subst'],
+                          {'type': str, 'default': "{}", 'dest': 'varsubst'}),
+                         ),)
 
     config_section = 'variable-substituting reader'
     config_section_dependencies = ('standalone reader', 'readers')
