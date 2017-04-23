@@ -126,19 +126,20 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                             'for --targetlinewidth')
 
         tlw = self.settings.targetlinewidth
-        # open image
         img = PIL.Image.open(uri)
 
-        # determine required autorotation
-        tags = dict([(PIL.ExifTags.TAGS.get(k, k), v)
-                     for k, v in img._getexif().items()])
-        orientation = tags.get('Orientation', 1)  # default means 'upright'
+        # autorotate jpegs:
+        if img.format == 'JPEG':
+            # determine orientation:
+            tags = dict([(PIL.ExifTags.TAGS.get(k, k), v)
+                         for k, v in img._getexif().items()])
+            orientation = tags.get('Orientation', 1)  # default means 'upright'
 
-        # rotate and scale image
-        for op in self.exiftrans[orientation]:
-            img = img.transpose(op)
-        # now, the image is upright
-        # determine scaling from rst and image
+            # rotate and scale image
+            for op in self.exiftrans[orientation]:
+                img = img.transpose(op)
+
+        # scale image:
         width = img.width
         newwidth = img.width
         if node.hasattr('width'):
@@ -147,10 +148,10 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                 newwidth = int(float(newwidth[:-1]) * 1e-2 * tlw)
         height = img.height
         newheight = int(newwidth / width * height)
-        # XXX is exif orientation tag also correct now?
         img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)
-        # store image
+
+        # store image:
         img.save(newuri)
-#        copyfile(uri, newuri)
+        # XXX PIL loses EXIF information
 
         super().visit_image(node)
