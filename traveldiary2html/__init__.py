@@ -1,3 +1,0 @@
-"""
-traveldiary2html package
-"""
