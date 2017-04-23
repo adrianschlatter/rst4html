@@ -143,9 +143,13 @@ class ModifiedHTMLTranslator(HTMLTranslator):
         width = img.width
         newwidth = img.width
         if node.hasattr('width'):
-            newwidth = node['width']
-            if newwidth[-1] == '%':
-                newwidth = int(float(newwidth[:-1]) * 1e-2 * tlw)
+            if node['width'][-1] == '%':
+                newwidth = int(float(node['width'][:-1]) * 1e-2 * tlw)
+            elif node['width'][-2:] == 'px':
+                newwidth = int(node['width'][:-2])
+            else:
+                raise NotImplemented('width {0} not understood'.format(
+                                                            node['width']))
         height = img.height
         newheight = int(newwidth / width * height)
         img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)
