@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Reader and Writer supporting special features useful for travel-diary creation
+Reader and Writer supporting special features such as
+
+- copying images to a target directory
+- autorotation of images
+- scaling of images according to rst attributes
 """
 
 from docutils.readers.standalone import Reader as Standalone
@@ -10,7 +14,6 @@ from .utils import export
 from json import loads, JSONDecodeError
 from os.path import join, basename, exists, isdir
 from os import mkdir, listdir
-from shutil import copyfile
 
 # check for the Python Imaging Library
 try:
@@ -35,11 +38,11 @@ class Reader(Standalone):
     """Standalone reader adding support for variable substitution at runtime"""
 
     settings_spec = Standalone.settings_spec[0:2] + (
-                        Standalone.settings_spec[2] +
-                        (('Define variable substitutions as a JSON dictionary',
-                          ['--subst'],
-                          {'type': str, 'default': "{}", 'dest': 'varsubst'}),
-                         ),)
+        Standalone.settings_spec[2] +
+        (('Define variable substitutions as a JSON dictionary',
+          ['--subst'],
+          {'type': str, 'default': "{}", 'dest': 'varsubst'}),
+         ),)
 
     config_section = 'variable-substituting reader'
     config_section_dependencies = ('standalone reader', 'readers')
@@ -72,14 +75,13 @@ class Writer(HtmlWriter):
     """
 
     settings_spec = HtmlWriter.settings_spec[0:2] + (
-                        HtmlWriter.settings_spec[2] +
-                        (('Copy images to this directory',
-                          ['--imgtargetdir'],
-                          {'type': str, 'default': 'img'}),
-                         ('Line width in pixels for picture size calculation',
-                          ['--targetlinewidth'],
-                          {'type': int})),
-                    )
+        HtmlWriter.settings_spec[2] +
+        (('Copy images to this directory',
+          ['--imgtargetdir'],
+          {'type': str, 'default': 'img'}),
+         ('Line width in pixels for picture size calculation',
+          ['--targetlinewidth'],
+          {'type': int})),)
 
     config_section = 'html4css1 with image-copies writer'
 
@@ -149,7 +151,7 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                 newwidth = int(node['width'][:-2])
             else:
                 raise NotImplemented('width {0} not understood'.format(
-                                                            node['width']))
+                    node['width']))
         height = img.height
         newheight = int(newwidth / width * height)
         img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)

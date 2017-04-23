@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-traveldiary2html command-line tool
+rst4html command-line tool
 """
 
-from traveldiary2html import Reader, Writer
+from rst4html import Reader, Writer
 
 
 def main():
@@ -15,15 +15,15 @@ def main():
 
     from docutils.core import publish_cmdline, default_description
 
-    diaryreader = Reader()
-    diarywriter = Writer()
+    reader = Reader()
+    writer = Writer()
 
     description = ('Generates (X)HTML documents from reStructuredText '
                    'sources with support for variables and image '
                    'pre-processing  ' + default_description)
 
-    publish_cmdline(reader=diaryreader, reader_name='traveldiary',
-                    writer=diarywriter, writer_name='traveldiary',
+    publish_cmdline(reader=reader, reader_name='rst4html',
+                    writer=writer, writer_name='rst4html',
                     description=description)
 
 
