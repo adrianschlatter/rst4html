@@ -76,7 +76,10 @@ class Writer(HtmlWriter):
                         (('Copy images to this directory',
                           ['--imgtargetdir'],
                           {'type': str, 'default': 'img'}),
-                         ),)
+                         ('Line width in pixels for picture size calculation',
+                          ['--targetlinewidth'],
+                          {'type': int})),
+                    )
 
     config_section = 'html4css1 with image-copies writer'
 
@@ -117,7 +120,12 @@ class ModifiedHTMLTranslator(HTMLTranslator):
         uri = node['uri']
         newuri = join(self.settings.imgtargetdir, basename(uri))
         node['uri'] = newuri
-        tlw = 600
+
+        if type(self.settings.targetlinewidth) != int:
+            raise TypeError('You need to specify an integer '
+                            'for --targetlinewidth')
+
+        tlw = self.settings.targetlinewidth
         # open image
         img = PIL.Image.open(uri)
 
