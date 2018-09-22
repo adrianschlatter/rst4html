@@ -1,17 +1,27 @@
 rst4html
 ++++++++
 
+.. keywords: rst restructuredText html variable substitution image-processing
+
 The purpose of this tool is to convert restructuredText to html, i.e.,
 similar to rst2html provided by docutils. However, rst4html also
 provides a number of features not included in docutils, such as variable
 substitution and image pre-processing.
+
+It is intended for situations you need to collect (and maybe resize) images
+from one or more locations to one central location. Imagine your library of
+holiday pictures and you want to create a website including only the best
+but in a resolution suitable for the web. Of course, you want the pictures
+in the website directory. But you probably also want it in its original place
+in its original resolution.
 
 
 ==========
 variables
 ==========
 
-{varname} expression will be substituted at conversion time. This intended for images and figures. Example::
+{varname} expression will be substituted at conversion time. This is
+intended for images and figures. Example::
 
 	.. figure:: {imp}/DSC_9657.JPG
 	    :alt: Wagen- und Zeltburg mit Campingtischen in der Mitte.
@@ -21,7 +31,7 @@ variables
 	    den See und das Feuerwerk.
 
 
-This will be converted as follows:
+This is converted as follows:
 
 >>> rst4html --subst '{"imp": "../pics/iceland"}' my.rst
 
@@ -30,7 +40,7 @@ This will be converted as follows:
 Image processing
 ================
 
-A key feature of rst4html is the ability to link to images at arbitrary
+A key feature of rst4html is the ability to refer to images at arbitrary
 places. The tool will collect the images from there, process them, and
 store them very you want them to be. This way, your high-resolution
 fotos remain in your foto library. You can also apply transformations
