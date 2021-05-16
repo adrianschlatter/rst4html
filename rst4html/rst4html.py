@@ -7,6 +7,8 @@ Reader and Writer supporting special features such as
 - scaling of images according to rst attributes
 """
 
+# flake8: noqa: W504
+
 from docutils.readers.standalone import Reader as Standalone
 from docutils.writers.html4css1 import Writer as HtmlWriter
 from docutils.writers.html4css1 import HTMLTranslator
@@ -150,7 +152,7 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             elif node['width'][-2:] == 'px':
                 newwidth = int(node['width'][:-2])
             else:
-                raise NotImplemented('width {0} not understood'.format(
+                raise NotImplementedError('width {0} not understood'.format(
                     node['width']))
         height = img.height
         newheight = int(newwidth / width * height)

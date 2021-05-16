@@ -12,3 +12,6 @@ __pycache__/
 .tox
 .cache
 .eggs/
+
+# due to vscode:
+settings.json

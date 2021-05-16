@@ -35,7 +35,6 @@ setup(
 
     # Author details
     author='Adrian Schlatter',
-    author_email='ad@tambora.ch',
 
     # Choose your license
     license='Revised BSD',
@@ -83,7 +82,7 @@ setup(
     # $ pip install -e .[dev,test]
     extras_require={
         'dev': ['check-manifest'],
-        'test': [],
+        'test': ['pytest', 'check-manifest', 'flake8'],
     },
 
     # To provide executable scripts, use entry points in preference to the

@@ -7,11 +7,8 @@ from rst4html import Reader, Writer
 
 
 def main():
-    try:
-        import locale
-        locale.setlocale(locale.LC_ALL, '')
-    except:
-        pass
+    import locale
+    locale.setlocale(locale.LC_ALL, '')
 
     from docutils.core import publish_cmdline, default_description
 
