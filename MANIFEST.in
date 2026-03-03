@@ -3,3 +3,6 @@ include LICENSE.txt
 
 # Include docs
 recursive-include docs *.rst
+
+# Include tests
+recursive-include tests *.py
