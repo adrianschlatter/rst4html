@@ -77,6 +77,48 @@ def build_mosaic_doctree(content: str) -> nodes.document:
     return document
 
 
+@pytest.fixture
+def translator_factory() -> Callable[[Any, int], core.ModifiedHTMLTranslator]:
+    """Build modified translators configured for tests."""
+
+    def factory(
+        tmp_path: Any,
+        targetlinewidth: int = 200,
+    ) -> core.ModifiedHTMLTranslator:
+        translator = core.ModifiedHTMLTranslator.__new__(
+            core.ModifiedHTMLTranslator
+        )
+        translator.settings = types.SimpleNamespace(
+            imgtargetdir=str(tmp_path),
+            targetlinewidth=targetlinewidth,
+        )
+        translator.body = []
+        return translator
+
+    return factory
+
+
+@pytest.fixture
+def mosaic_row_factory(
+    ) -> Callable[[Any, str, str, Tuple[str, ...]], nodes.container]:
+    """Build mosaic row containers for tests."""
+
+    def factory(
+        tmp_path: Any,
+        width: str = "100%",
+        border: str = "2%",
+        images: Tuple[str, ...] = (),
+    ) -> nodes.container:
+        row = nodes.container(classes=["mosaic-row"])
+        row["mosaic_width"] = width
+        row["mosaic_border"] = border
+        for image in images:
+            row += nodes.image(uri=str(tmp_path / image))
+        return row
+
+    return factory
+
+
 def test_export_decorator_adds_to_all() -> None:
     """Ensure export decorator populates __all__."""
     assert "Reader" in core.__all__
@@ -760,22 +802,17 @@ def test_modified_translator_mosaic_caption_paragraph() -> None:
 
 
 def test_modified_translator_mosaic_row_renders_images(
-                                        monkeypatch: pytest.MonkeyPatch,
-                                        tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Render mosaic rows by resizing images to a shared height."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        images=("image1.png", "image2.png"),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "2%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
-    row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
         """Stub image with fixed dimensions for mosaics."""
@@ -818,19 +855,13 @@ def test_modified_translator_mosaic_row_renders_images(
 
 
 def test_modified_translator_mosaic_row_skips_when_no_images(
-                                                        tmp_path: Any) -> None:
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Handle mosaic rows without images gracefully."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
-    )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "2%"
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(tmp_path)
 
     with pytest.raises(nodes.SkipNode):
         core.ModifiedHTMLTranslator.visit_container(translator, row)
@@ -839,22 +870,19 @@ def test_modified_translator_mosaic_row_skips_when_no_images(
     assert "<div class=\"mosaic\"" in html
 
 
-def test_modified_translator_mosaic_border_px(monkeypatch: pytest.MonkeyPatch,
-                                              tmp_path: Any) -> None:
+def test_modified_translator_mosaic_border_px(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Convert mosaic border px to percent."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        border="10px",
+        images=("image1.png", "image2.png"),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "10px"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
-    row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
         """Stub image for border calculations."""
@@ -883,22 +911,19 @@ def test_modified_translator_mosaic_border_px(monkeypatch: pytest.MonkeyPatch,
     assert "--ar: 1.0000;" in html
 
 
-def test_modified_translator_mosaic_no_upscale(monkeypatch: pytest.MonkeyPatch,
-                                               tmp_path: Any) -> None:
+def test_modified_translator_mosaic_no_upscale(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Avoid upscaling mosaic images past their original size."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "2%"
     row["mosaic_last"] = True
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image that tracks resize usage."""
@@ -930,22 +955,18 @@ def test_modified_translator_mosaic_no_upscale(monkeypatch: pytest.MonkeyPatch,
 
 
 def test_modified_translator_mosaic_border_invalid_defaults(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Fallback to default border when border value is invalid."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        border="bad",
+        images=("image1.png", "image2.png"),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "bad"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
-    row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
         """Stub image for invalid border tests."""
@@ -974,22 +995,18 @@ def test_modified_translator_mosaic_border_invalid_defaults(
 
 
 def test_modified_translator_mosaic_border_negative_clamped(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Clamp negative border percent to zero."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        border="-5%",
+        images=("image1.png", "image2.png"),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "-5%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
-    row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
         """Stub image for negative border tests."""
@@ -1019,21 +1036,17 @@ def test_modified_translator_mosaic_border_negative_clamped(
 
 
 def test_modified_translator_mosaic_zero_height(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Handle images with zero height safely."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "2%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for zero-height tests."""
@@ -1073,20 +1086,17 @@ def test_mosaic_chunks_breaks_when_no_remaining() -> None:
 def test_modified_translator_mosaic_width_numeric(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
     """Parse numeric mosaic width values."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        width="300",
+        border="10px",
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "300"
-    row["mosaic_border"] = "10px"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for numeric width test."""
@@ -1115,20 +1125,16 @@ def test_modified_translator_mosaic_width_numeric(
 def test_modified_translator_mosaic_width_px(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
     """Parse pixel mosaic width values."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        width="300px",
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "300px"
-    row["mosaic_border"] = "2%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for pixel width test."""
@@ -1253,20 +1259,16 @@ def test_render_mosaic_images() -> None:
 def test_modified_translator_mosaic_width_invalid(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
     """Ignore invalid mosaic width values."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        width="bad",
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "bad"
-    row["mosaic_border"] = "2%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for invalid width test."""
@@ -1295,20 +1297,16 @@ def test_modified_translator_mosaic_width_invalid(
 def test_modified_translator_mosaic_border_invalid_percent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
     """Fallback when border percent is invalid."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        border="bad%",
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "bad%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for invalid percent border."""
@@ -1337,20 +1335,16 @@ def test_modified_translator_mosaic_border_invalid_percent(
 def test_modified_translator_mosaic_border_invalid_px(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
     """Fallback when border px is invalid."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        border="badpx",
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "badpx"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for invalid px border."""
@@ -1377,21 +1371,17 @@ def test_modified_translator_mosaic_border_invalid_px(
 
 
 def test_modified_translator_mosaic_resizes_large_images(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+    mosaic_row_factory: Callable[..., nodes.container],
+) -> None:
     """Resize mosaic images that exceed the max width."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
+    translator = translator_factory(tmp_path)
+    row = mosaic_row_factory(
+        tmp_path,
+        images=("image1.png",),
     )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
-    row = nodes.container(classes=["mosaic-row"])
-    row["mosaic_width"] = "100%"
-    row["mosaic_border"] = "2%"
-    row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
         """Stub image for max width resizing."""
@@ -1420,16 +1410,12 @@ def test_modified_translator_mosaic_resizes_large_images(
     assert dummy.resize_args == (425, 212)
 
 
-def test_modified_translator_mosaic_caption_container(tmp_path: Any) -> None:
+def test_modified_translator_mosaic_caption_container(
+    tmp_path: Any,
+    translator_factory: Callable[..., core.ModifiedHTMLTranslator],
+) -> None:
     """Render mosaic caption containers with custom markup."""
-    translator = core.ModifiedHTMLTranslator.__new__(
-        core.ModifiedHTMLTranslator
-    )
-    translator.settings = types.SimpleNamespace(
-        imgtargetdir=str(tmp_path),
-        targetlinewidth=200,
-    )
-    translator.body = []
+    translator = translator_factory(tmp_path)
     node = nodes.container(classes=["mosaic-caption"])
 
     core.ModifiedHTMLTranslator.visit_container(translator, node)
