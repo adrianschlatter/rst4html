@@ -1237,6 +1237,18 @@ def test_prepare_mosaic_image_no_resize(tmp_path: Any) -> None:
     assert dummy.saved == newuri
 
 
+def test_render_mosaic_images() -> None:
+    """Build HTML snippets for mosaic images."""
+    html = core._render_mosaic_images([
+        ("/img/a.png", 2.0),
+        ("/img/b.png", 1.0),
+    ])
+    assert html == (
+        '    <img src="/img/a.png" style="--ar: 2.0000;">\n'
+        '    <img src="/img/b.png" style="--ar: 1.0000;">\n'
+    )
+
+
 def test_modified_translator_mosaic_width_invalid(
                                         monkeypatch: pytest.MonkeyPatch,
                                         tmp_path: Any) -> None:

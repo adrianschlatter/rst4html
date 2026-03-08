@@ -146,6 +146,19 @@ def _prepare_mosaic_image(
     return newuri, ratio
 
 
+def _render_mosaic_images(image_infos: Sequence[Tuple[str, float]]) -> str:
+    """Render mosaic image HTML snippets."""
+    lines = []
+    for newuri, ratio in image_infos:
+        lines.append(
+            '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
+                newuri,
+                ratio,
+            )
+        )
+    return "".join(lines)
+
+
 class Mosaic(Directive):
     """Directive that renders image mosaics with optional captions."""
 
@@ -347,7 +360,7 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             border_percent = _parse_mosaic_border(mosaic_border, width)
 
             images = [child for child in node if isinstance(child, nodes.image)]
-            image_infos: List[Tuple[nodes.image, str, float]] = []
+            image_infos: List[Tuple[str, float]] = []
             max_width = 425
             for image in images:
                 newuri, ratio = _prepare_mosaic_image(
@@ -355,16 +368,10 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                     self.settings.imgtargetdir,
                     max_width,
                 )
-                image_infos.append((image, newuri, ratio))
+                image_infos.append((newuri, ratio))
 
             self.body.append('<div class="mosaic">\n')
-            for index, (image, newuri, ratio) in enumerate(image_infos):
-                self.body.append(
-                    '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
-                        newuri,
-                        ratio,
-                    )
-                )
+            self.body.append(_render_mosaic_images(image_infos))
             self.body.append('</div>\n')
             raise nodes.SkipNode
 
