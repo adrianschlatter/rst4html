@@ -89,6 +89,45 @@ def _chunk_images(imgs: Sequence[str], counts: Sequence[int]) -> List[List[str]]
     return rows
 
 
+def _parse_mosaic_width(mosaic_width: Any, targetlinewidth: int) -> int:
+    """Parse mosaic width values into pixels."""
+    width = targetlinewidth
+    if isinstance(mosaic_width, str) and mosaic_width.endswith('%'):
+        width = int(float(mosaic_width[:-1]) * 1e-2 * width)
+    elif isinstance(mosaic_width, str) and mosaic_width.endswith('px'):
+        width = int(mosaic_width[:-2])
+    else:
+        try:
+            width = int(mosaic_width)
+        except (TypeError, ValueError):
+            pass
+    return width
+
+
+def _parse_mosaic_border(mosaic_border: Any, width: int) -> float:
+    """Parse mosaic border values into percent."""
+    border_percent = 2.0
+    if isinstance(mosaic_border, str) and mosaic_border.endswith('%'):
+        try:
+            border_percent = float(mosaic_border[:-1])
+        except ValueError:
+            border_percent = 2.0
+    elif isinstance(mosaic_border, str) and mosaic_border.endswith('px'):
+        try:
+            border_px = float(mosaic_border[:-2])
+            border_percent = (border_px / width * 100) if width else 0.0
+        except ValueError:
+            border_percent = 2.0
+    else:
+        try:
+            border_percent = float(mosaic_border)
+        except (TypeError, ValueError):
+            border_percent = 2.0
+    if border_percent < 0:
+        border_percent = 0.0
+    return border_percent
+
+
 class Mosaic(Directive):
     """Directive that renders image mosaics with optional captions."""
 
@@ -286,36 +325,8 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                 self._mosaic_opened = True
             mosaic_width = node.get('mosaic_width', '100%')
             mosaic_border = node.get('mosaic_border', '2%')
-            width = self.settings.targetlinewidth
-            if isinstance(mosaic_width, str) and mosaic_width.endswith('%'):
-                width = int(float(mosaic_width[:-1]) * 1e-2 * width)
-            elif isinstance(mosaic_width, str) and mosaic_width.endswith('px'):
-                width = int(mosaic_width[:-2])
-            else:
-                try:
-                    width = int(mosaic_width)
-                except (TypeError, ValueError):
-                    pass
-
-            border_percent = 2.0
-            if isinstance(mosaic_border, str) and mosaic_border.endswith('%'):
-                try:
-                    border_percent = float(mosaic_border[:-1])
-                except ValueError:
-                    border_percent = 2.0
-            elif isinstance(mosaic_border, str) and mosaic_border.endswith('px'):
-                try:
-                    border_px = float(mosaic_border[:-2])
-                    border_percent = (border_px / width * 100) if width else 0.0
-                except ValueError:
-                    border_percent = 2.0
-            else:
-                try:
-                    border_percent = float(mosaic_border)
-                except (TypeError, ValueError):
-                    border_percent = 2.0
-            if border_percent < 0:
-                border_percent = 0.0
+            width = _parse_mosaic_width(mosaic_width, self.settings.targetlinewidth)
+            border_percent = _parse_mosaic_border(mosaic_border, width)
 
             images = [child for child in node if isinstance(child, nodes.image)]
             image_infos: List[Tuple[nodes.image, Any, float]] = []

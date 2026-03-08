@@ -1153,6 +1153,16 @@ def test_modified_translator_mosaic_width_px(
     assert "<div class=\"mosaic\">" in "".join(translator.body)
 
 
+def test_parse_mosaic_width_px() -> None:
+    """Convert pixel widths to integers."""
+    assert core._parse_mosaic_width("300px", 200) == 300
+
+
+def test_parse_mosaic_border_px() -> None:
+    """Convert pixel borders to percent."""
+    assert core._parse_mosaic_border("10px", 200) == 5.0
+
+
 def test_modified_translator_mosaic_width_invalid(
                                         monkeypatch: pytest.MonkeyPatch,
                                         tmp_path: Any) -> None:
