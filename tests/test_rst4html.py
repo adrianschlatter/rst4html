@@ -1071,8 +1071,9 @@ def test_mosaic_chunks_breaks_when_no_remaining() -> None:
 
 
 def test_modified_translator_mosaic_width_numeric(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Parse numeric mosaic width values."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1250,8 +1251,9 @@ def test_render_mosaic_images() -> None:
 
 
 def test_modified_translator_mosaic_width_invalid(
-                                        monkeypatch: pytest.MonkeyPatch,
-                                        tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Ignore invalid mosaic width values."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1291,8 +1293,9 @@ def test_modified_translator_mosaic_width_invalid(
 
 
 def test_modified_translator_mosaic_border_invalid_percent(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Fallback when border percent is invalid."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1332,8 +1335,9 @@ def test_modified_translator_mosaic_border_invalid_percent(
 
 
 def test_modified_translator_mosaic_border_invalid_px(
-                                            monkeypatch: pytest.MonkeyPatch,
-                                            tmp_path: Any) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Fallback when border px is invalid."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator

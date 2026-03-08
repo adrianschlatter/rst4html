@@ -47,6 +47,12 @@ except ImportError:
         PIL = None
 
 
+DEFAULT_MOSAIC_WIDTH = '100%'
+DEFAULT_MOSAIC_BORDER = '2%'
+DEFAULT_MOSAIC_BORDER_PERCENT = 2.0
+MOSAIC_MAX_WIDTH = 425
+
+
 def _parse_mosaic_arguments(arguments: Sequence[str]) -> List[int]:
     """Parse mosaic row counts from directive arguments."""
     if not arguments:
@@ -106,23 +112,23 @@ def _parse_mosaic_width(mosaic_width: Any, targetlinewidth: int) -> int:
 
 def _parse_mosaic_border(mosaic_border: Any, width: int) -> float:
     """Parse mosaic border values into percent."""
-    border_percent = 2.0
+    border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
     if isinstance(mosaic_border, str) and mosaic_border.endswith('%'):
         try:
             border_percent = float(mosaic_border[:-1])
         except ValueError:
-            border_percent = 2.0
+            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
     elif isinstance(mosaic_border, str) and mosaic_border.endswith('px'):
         try:
             border_px = float(mosaic_border[:-2])
             border_percent = (border_px / width * 100) if width else 0.0
         except ValueError:
-            border_percent = 2.0
+            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
     else:
         try:
             border_percent = float(mosaic_border)
         except (TypeError, ValueError):
-            border_percent = 2.0
+            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
     if border_percent < 0:
         border_percent = 0.0
     return border_percent
@@ -146,10 +152,10 @@ def _prepare_mosaic_image(
     return newuri, ratio
 
 
-def _render_mosaic_images(image_infos: Sequence[Tuple[str, float]]) -> str:
+def _render_mosaic_images(image_entries: Sequence[Tuple[str, float]]) -> str:
     """Render mosaic image HTML snippets."""
     lines = []
-    for newuri, ratio in image_infos:
+    for newuri, ratio in image_entries:
         lines.append(
             '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
                 newuri,
@@ -179,8 +185,8 @@ class Mosaic(Directive):
             )]
 
         images = []
-        width = '100%'
-        border = '2%'
+        width = DEFAULT_MOSAIC_WIDTH
+        border = DEFAULT_MOSAIC_BORDER
         for line in self.content:
             stripped = line.strip()
             if stripped.startswith(':img:'):
@@ -354,24 +360,24 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             if not getattr(self, '_mosaic_opened', False):
                 self.body.append('\n')
                 self._mosaic_opened = True
-            mosaic_width = node.get('mosaic_width', '100%')
-            mosaic_border = node.get('mosaic_border', '2%')
+            mosaic_width = node.get('mosaic_width', DEFAULT_MOSAIC_WIDTH)
+            mosaic_border = node.get('mosaic_border', DEFAULT_MOSAIC_BORDER)
             width = _parse_mosaic_width(mosaic_width, self.settings.targetlinewidth)
             border_percent = _parse_mosaic_border(mosaic_border, width)
 
             images = [child for child in node if isinstance(child, nodes.image)]
-            image_infos: List[Tuple[str, float]] = []
-            max_width = 425
+            image_entries: List[Tuple[str, float]] = []
+            max_width = MOSAIC_MAX_WIDTH
             for image in images:
                 newuri, ratio = _prepare_mosaic_image(
                     image,
                     self.settings.imgtargetdir,
                     max_width,
                 )
-                image_infos.append((newuri, ratio))
+                image_entries.append((newuri, ratio))
 
             self.body.append('<div class="mosaic">\n')
-            self.body.append(_render_mosaic_images(image_infos))
+            self.body.append(_render_mosaic_images(image_entries))
             self.body.append('</div>\n')
             raise nodes.SkipNode
 
