@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Reader and Writer supporting special features such as
+Reader and writer helpers for docutils with image processing and mosaics.
+
+Features include:
 
 - copying images to a target directory
 - autorotation of images
 - scaling of images according to rst attributes
+- mosaic directive rendering
 """
 
+from __future__ import annotations
+
 # flake8: noqa: W504
+
+from typing import Any, Dict, List, Sequence, Tuple
 
 from docutils import nodes
 from docutils.parsers.rst import Directive, directives
@@ -30,6 +37,8 @@ except ImportError:
         import ExifTags
 
         class PIL(object):
+            """Fallback wrapper for legacy PIL modules."""
+
             pass  # dummy wrapper
 
         PIL.Image = Image
@@ -38,10 +47,11 @@ except ImportError:
         PIL = None
 
 
-def _parse_mosaic_arguments(arguments):
+def _parse_mosaic_arguments(arguments: Sequence[str]) -> List[int]:
+    """Parse mosaic row counts from directive arguments."""
     if not arguments:
         return []
-    counts = []
+    counts: List[int] = []
     for arg in arguments:
         value = int(arg)
         if value < 1:
@@ -50,18 +60,19 @@ def _parse_mosaic_arguments(arguments):
     return counts
 
 
-def _chunk_images(imgs, counts):
+def _chunk_images(imgs: Sequence[str], counts: Sequence[int]) -> List[List[str]]:
+    """Split image URIs into rows based on the provided counts."""
     if not counts:
         return [[img] for img in imgs]
     if sum(counts) <= len(imgs):
-        rows = []
+        rows: List[List[str]] = []
         start = 0
         for count in counts:
-            rows.append(imgs[start:start + count])
+            rows.append(list(imgs[start:start + count]))
             start += count
         remaining = imgs[start:]
         if remaining:
-            rows.append(remaining)
+            rows.append(list(remaining))
         return rows
 
     rows = []
@@ -71,18 +82,21 @@ def _chunk_images(imgs, counts):
         if remaining <= 0:
             break
         if remaining < count:
-            rows.append(imgs[start:])
+            rows.append(list(imgs[start:]))
             break
-        rows.append(imgs[start:start + count])
+        rows.append(list(imgs[start:start + count]))
         start += count
     return rows
 
 
 class Mosaic(Directive):
-    has_content = True
-    option_spec = {}
+    """Directive that renders image mosaics with optional captions."""
 
-    def run(self):
+    has_content = True
+    option_spec: Dict[str, Any] = {}
+
+    def run(self) -> List[nodes.Node]:
+        """Parse the directive body into mosaic rows and caption nodes."""
         args_line = self.block_text.splitlines()[0]
         args_part = args_line.split('::', 1)[1].strip() if '::' in args_line else ''
         raw_args = args_part.split() if args_part else []
@@ -164,66 +178,85 @@ directives.register_directive('mosaic', Mosaic)
 
 @export
 class Reader(Standalone):
-    """Standalone reader adding support for variable substitution at runtime"""
+    """Standalone reader adding support for variable substitution at runtime."""
 
     settings_spec = Standalone.settings_spec[0:2] + (
-        Standalone.settings_spec[2] +
-        (('Define variable substitutions as a JSON dictionary',
-          ['--subst'],
-          {'type': str, 'default': "{}", 'dest': 'varsubst'}),
-         ),)
+        Standalone.settings_spec[2]
+        + (
+            (
+                'Define variable substitutions as a JSON dictionary',
+                ['--subst'],
+                {'type': str, 'default': "{}", 'dest': 'varsubst'},
+            ),
+        ),
+    )
 
     config_section = 'variable-substituting reader'
     config_section_dependencies = ('standalone reader', 'readers')
 
-    def read(self, source, parser, settings):
+    def read(
+        self,
+        source: Any,
+        parser: Any,
+        settings: Any,
+    ) -> nodes.document:
+        """Read, substitute variables, and parse into a document tree."""
         self.source = source
         if not self.parser:
             self.parser = parser
         try:
             settings.varsubst = loads(settings.varsubst)
-        except JSONDecodeError as e:
-            raise JSONDecodeError('Unable to parse variable substitutions',
-                                  e.doc, e.pos)
+        except JSONDecodeError as exc:
+            raise JSONDecodeError(
+                'Unable to parse variable substitutions',
+                exc.doc,
+                exc.pos,
+            )
 
         self.settings = settings
         self.input = self.source.read()
         try:
             self.input = self.input.format(**settings.varsubst)
-        except KeyError:
-            raise KeyError('Error during substitution of variables')
+        except KeyError as exc:
+            raise KeyError('Error during substitution of variables') from exc
         self.parse()
         return self.document
 
 
 @export
 class Writer(HtmlWriter):
-    """
-    HtmlWriter that copies images from their original location into a
-    configurable image directory.
-    """
+    """HTML writer that copies images into a configurable output directory."""
 
     settings_spec = HtmlWriter.settings_spec[0:2] + (
-        HtmlWriter.settings_spec[2] +
-        (('Copy images to this directory',
-          ['--imgtargetdir'],
-          {'type': str, 'default': 'img'}),
-         ('Line width in pixels for picture size calculation',
-          ['--targetlinewidth'],
-          {'type': int})),)
+        HtmlWriter.settings_spec[2]
+        + (
+            (
+                'Copy images to this directory',
+                ['--imgtargetdir'],
+                {'type': str, 'default': 'img'},
+            ),
+            (
+                'Line width in pixels for picture size calculation',
+                ['--targetlinewidth'],
+                {'type': int},
+            ),
+        ),
+    )
 
     config_section = 'html4css1 with image-copies writer'
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Configure the custom HTML translator."""
         super().__init__()
         self.translator_class = ModifiedHTMLTranslator
 
-    def write(self, document, destination):
+    def write(self, document: Any, destination: Any) -> None:
+        """Validate the target image directory before writing output."""
         imgtargetdir = document.settings.imgtargetdir
         if exists(imgtargetdir):
             if not isdir(imgtargetdir):
                 raise RuntimeError('imgtargetdir is not a directory')
-            elif listdir(imgtargetdir):
+            if listdir(imgtargetdir):
                 raise RuntimeError('imgtargetdir is not empty')
         else:
             mkdir(imgtargetdir)
@@ -232,21 +265,21 @@ class Writer(HtmlWriter):
 
 
 class ModifiedHTMLTranslator(HTMLTranslator):
-    """
-    Specialized HTMLTranslator that copies images from their original
-    location and places them in a separate image directory.
-    """
+    """HTML translator that copies and rescales images for output."""
 
-    exiftrans = {1: (),
-                 2: (PIL.Image.FLIP_LEFT_RIGHT,),
-                 3: (PIL.Image.ROTATE_180,),
-                 4: (PIL.Image.FLIP_TOP_BOTTOM,),
-                 5: (PIL.Image.TRANSPOSE, ),
-                 6: (PIL.Image.ROTATE_270,),
-                 7: (PIL.Image.FLIP_LEFT_RIGHT, PIL.Image.ROTATE_270),
-                 8: (PIL.Image.ROTATE_90,)}
+    exiftrans = {
+        1: (),
+        2: (PIL.Image.FLIP_LEFT_RIGHT,),
+        3: (PIL.Image.ROTATE_180,),
+        4: (PIL.Image.FLIP_TOP_BOTTOM,),
+        5: (PIL.Image.TRANSPOSE,),
+        6: (PIL.Image.ROTATE_270,),
+        7: (PIL.Image.FLIP_LEFT_RIGHT, PIL.Image.ROTATE_270),
+        8: (PIL.Image.ROTATE_90,),
+    }
 
-    def visit_container(self, node):
+    def visit_container(self, node: nodes.Node) -> None:
+        """Render mosaic rows with custom HTML and image processing."""
         if 'mosaic-row' in node.get('classes', []):
             if not getattr(self, '_mosaic_opened', False):
                 self.body.append('\n')
@@ -285,7 +318,7 @@ class ModifiedHTMLTranslator(HTMLTranslator):
                 border_percent = 0.0
 
             images = [child for child in node if isinstance(child, nodes.image)]
-            image_infos = []
+            image_infos: List[Tuple[nodes.image, Any, float]] = []
             for image in images:
                 img = PIL.Image.open(image['uri'])
                 ratio = img.width / img.height if img.height else 0
@@ -321,29 +354,34 @@ class ModifiedHTMLTranslator(HTMLTranslator):
 
         super().visit_container(node)
 
-    def depart_container(self, node):
+    def depart_container(self, node: nodes.Node) -> None:
+        """Defer to the base container handling."""
         super().depart_container(node)
 
-    def visit_paragraph(self, node):
+    def visit_paragraph(self, node: nodes.paragraph) -> None:
+        """Render mosaic captions as plain paragraph tags."""
         if node.get('mosaic_caption', False):
             self.body.append('<p class="caption">')
             return
         super().visit_paragraph(node)
 
-    def depart_paragraph(self, node):
+    def depart_paragraph(self, node: nodes.paragraph) -> None:
+        """Close mosaic caption paragraphs without extra whitespace."""
         if node.get('mosaic_caption', False):
             self.body.append('</p>\n')
             return
         super().depart_paragraph(node)
 
-    def visit_image(self, node):
+    def visit_image(self, node: nodes.image) -> None:
+        """Copy, rotate, and resize images before emitting HTML."""
         uri = node['uri']
         newuri = join(self.settings.imgtargetdir, basename(uri))
         node['uri'] = newuri
 
         if type(self.settings.targetlinewidth) != int:
-            raise TypeError('You need to specify an integer '
-                            'for --targetlinewidth')
+            raise TypeError(
+                'You need to specify an integer for --targetlinewidth'
+            )
 
         tlw = self.settings.targetlinewidth
         img = PIL.Image.open(uri)
@@ -351,8 +389,9 @@ class ModifiedHTMLTranslator(HTMLTranslator):
         # autorotate jpegs:
         if img.format == 'JPEG':
             # determine orientation:
-            tags = dict([(PIL.ExifTags.TAGS.get(k, k), v)
-                         for k, v in img._getexif().items()])
+            tags = dict(
+                [(PIL.ExifTags.TAGS.get(k, k), v) for k, v in img._getexif().items()]
+            )
             orientation = tags.get('Orientation', 1)  # default means 'upright'
 
             # rotate and scale image
@@ -368,8 +407,9 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             elif node['width'][-2:] == 'px':
                 newwidth = int(node['width'][:-2])
             else:
-                raise NotImplementedError('width {0} not understood'.format(
-                    node['width']))
+                raise NotImplementedError(
+                    'width {0} not understood'.format(node['width'])
+                )
         height = img.height
         newheight = int(newwidth / width * height)
         img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)

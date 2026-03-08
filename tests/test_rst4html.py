@@ -1,9 +1,13 @@
+"""Test suite for the rst4html package."""
+
+from __future__ import annotations
+
 import importlib
 import types
+from typing import Any, Callable, Dict, Tuple
 
 import pytest
 from docutils import nodes
-from docutils.core import publish_doctree
 from docutils.frontend import OptionParser
 from docutils.io import StringInput
 from docutils.parsers.rst import Parser
@@ -12,7 +16,11 @@ from docutils.utils import new_document
 core = importlib.import_module("rst4html.rst4html")
 
 
-def load_rst4html_module(monkeypatch, importer):
+def load_rst4html_module(
+    monkeypatch: pytest.MonkeyPatch,
+    importer: Callable[..., Any],
+) -> Any:
+    """Import the module via a custom import hook for PIL scenarios."""
     import builtins
     import importlib.util
     import sys
@@ -20,7 +28,14 @@ def load_rst4html_module(monkeypatch, importer):
 
     original_import = builtins.__import__
 
-    def wrapped_import(name, globals=None, locals=None, fromlist=(), level=0):
+    def wrapped_import(
+        name: str,
+        globals: Dict[str, Any] | None = None,
+        locals: Dict[str, Any] | None = None,
+        fromlist: Tuple[str, ...] = (),
+        level: int = 0,
+    ) -> Any:
+        """Proxy imports through the provided importer."""
         return importer(
             original_import,
             name,
@@ -41,6 +56,8 @@ def load_rst4html_module(monkeypatch, importer):
         module_name,
         path,
     )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Unable to load test module")
     module = importlib.util.module_from_spec(spec)
     module.__package__ = "rst4html"
     sys.modules[module_name] = module
@@ -48,11 +65,13 @@ def load_rst4html_module(monkeypatch, importer):
     return module
 
 
-def make_reader_settings(reader, parser):
+def make_reader_settings(reader: Any, parser: Any) -> Any:
+    """Construct default reader settings for tests."""
     return OptionParser(components=(reader, parser)).get_default_values()
 
 
-def build_mosaic_doctree(content):
+def build_mosaic_doctree(content: str) -> nodes.document:
+    """Parse mosaic directives into a docutils document tree."""
     parser = Parser()
     settings = OptionParser(components=(parser,)).get_default_values()
     document = new_document("test", settings=settings)
@@ -60,13 +79,13 @@ def build_mosaic_doctree(content):
     return document
 
 
-def test_export_decorator_adds_to_all():
+def test_export_decorator_adds_to_all() -> None:
     """Ensure export decorator populates __all__."""
     assert "Reader" in core.__all__
     assert "Writer" in core.__all__
 
 
-def test_reader_substitution_success():
+def test_reader_substitution_success() -> None:
     """Verify variable substitution replaces placeholders."""
     reader = core.Reader()
     parser = Parser()
@@ -77,7 +96,7 @@ def test_reader_substitution_success():
     assert document.astext() == "Hello World"
 
 
-def test_reader_invalid_json():
+def test_reader_invalid_json() -> None:
     """Raise JSONDecodeError for invalid substitution JSON."""
     reader = core.Reader()
     parser = Parser()
@@ -89,7 +108,7 @@ def test_reader_invalid_json():
     assert exc.value.msg == "Unable to parse variable substitutions"
 
 
-def test_reader_missing_variable():
+def test_reader_missing_variable() -> None:
     """Raise KeyError when a substitution key is missing."""
     reader = core.Reader()
     parser = Parser()
@@ -101,7 +120,7 @@ def test_reader_missing_variable():
     assert "Error during substitution of variables" in str(exc.value)
 
 
-def test_writer_rejects_non_empty_target_dir(tmp_path):
+def test_writer_rejects_non_empty_target_dir(tmp_path: Any) -> None:
     """Reject non-empty image target directories."""
     imgtargetdir = tmp_path / "imgs"
     imgtargetdir.mkdir()
@@ -115,7 +134,7 @@ def test_writer_rejects_non_empty_target_dir(tmp_path):
     assert "imgtargetdir is not empty" in str(exc.value)
 
 
-def test_writer_rejects_file_target(tmp_path):
+def test_writer_rejects_file_target(tmp_path: Any) -> None:
     """Reject image target paths that are files."""
     file_target = tmp_path / "imgtarget_file"
     file_target.write_text("data")
@@ -128,7 +147,10 @@ def test_writer_rejects_file_target(tmp_path):
     assert "imgtargetdir is not a directory" in str(exc.value)
 
 
-def test_writer_creates_target_dir_and_writes(monkeypatch, tmp_path):
+def test_writer_creates_target_dir_and_writes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Create target dir and delegate writing."""
     imgtargetdir = tmp_path / "imgs"
     document = types.SimpleNamespace(
@@ -139,9 +161,10 @@ def test_writer_creates_target_dir_and_writes(monkeypatch, tmp_path):
     )
     writer = core.Writer()
 
-    called = {}
+    called: Dict[str, Any] = {}
 
-    def fake_write(self, document, destination):
+    def fake_write(self: Any, document: Any, destination: Any) -> None:
+        """Capture the document and destination passed to HtmlWriter."""
         called["document"] = document
         called["destination"] = destination
 
@@ -151,7 +174,10 @@ def test_writer_creates_target_dir_and_writes(monkeypatch, tmp_path):
     assert called["document"] is document
 
 
-def test_writer_keeps_empty_target_dir(monkeypatch, tmp_path):
+def test_writer_keeps_empty_target_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Allow existing empty target directories."""
     imgtargetdir = tmp_path / "imgs"
     imgtargetdir.mkdir()
@@ -163,9 +189,10 @@ def test_writer_keeps_empty_target_dir(monkeypatch, tmp_path):
     )
     writer = core.Writer()
 
-    called = {}
+    called: Dict[str, Any] = {}
 
-    def fake_write(self, document, destination):
+    def fake_write(self: Any, document: Any, destination: Any) -> None:
+        """Capture the document and destination passed to HtmlWriter."""
         called["document"] = document
         called["destination"] = destination
 
@@ -174,7 +201,7 @@ def test_writer_keeps_empty_target_dir(monkeypatch, tmp_path):
     assert called["document"] is document
 
 
-def test_modified_translator_requires_integer_targetlinewidth():
+def test_modified_translator_requires_integer_targetlinewidth() -> None:
     """Require integer target linewidth for scaling."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -189,7 +216,9 @@ def test_modified_translator_requires_integer_targetlinewidth():
     assert "--targetlinewidth" in str(exc.value)
 
 
-def test_modified_translator_rejects_unknown_width(monkeypatch):
+def test_modified_translator_rejects_unknown_width(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Reject unsupported width formats."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -201,17 +230,22 @@ def test_modified_translator_rejects_unknown_width(monkeypatch):
     node = nodes.image(uri="/tmp/image.jpg", width="2em")
 
     class DummyImage:
+        """Stub image object without resizing."""
+
         format = "PNG"
         width = 100
         height = 50
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self to mimic PIL resizing."""
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
-    def fake_open(path):
+    def fake_open(path: str) -> DummyImage:
+        """Return a dummy image instance."""
         return DummyImage()
 
     monkeypatch.setattr(core.PIL.Image, "open", fake_open)
@@ -220,7 +254,10 @@ def test_modified_translator_rejects_unknown_width(monkeypatch):
     assert "width 2em not understood" in str(exc.value)
 
 
-def test_modified_translator_scales_percent_width(monkeypatch, tmp_path):
+def test_modified_translator_scales_percent_width(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Scale images based on percent widths."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -235,35 +272,48 @@ def test_modified_translator_scales_percent_width(monkeypatch, tmp_path):
     )
 
     class DummyImage:
+        """Stub image object capturing resize arguments."""
+
         format = "PNG"
         width = 400
         height = 200
 
-        def __init__(self):
-            self.resize_args = None
-            self.saved = None
+        def __init__(self) -> None:
+            """Initialize placeholders for resize args."""
+            self.resize_args: Tuple[Tuple[int, int], Any] | None = None
+            self.saved: str | None = None
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Capture resize arguments and return self."""
             self.resize_args = (size, resample)
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Capture the save path."""
             self.saved = path
 
     dummy = DummyImage()
 
-    def fake_open(path):
+    def fake_open(path: str) -> DummyImage:
+        """Return the shared dummy image instance."""
         return dummy
 
+    def noop_visit_image(*_: Any) -> None:
+        """Disable base HTML image rendering for the test."""
+        return None
+
     monkeypatch.setattr(core.PIL.Image, "open", fake_open)
-    monkeypatch.setattr(core.HTMLTranslator, "visit_image", lambda *_: None)
+    monkeypatch.setattr(core.HTMLTranslator, "visit_image", noop_visit_image)
 
     core.ModifiedHTMLTranslator.visit_image(translator, node)
     assert dummy.resize_args[0] == (100, 50)
     assert dummy.saved.endswith("image.jpg")
 
 
-def test_modified_translator_scales_px_width(monkeypatch, tmp_path):
+def test_modified_translator_scales_px_width(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Scale images based on pixel widths."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -278,35 +328,48 @@ def test_modified_translator_scales_px_width(monkeypatch, tmp_path):
     )
 
     class DummyImage:
+        """Stub image object capturing resize arguments."""
+
         format = "PNG"
         width = 400
         height = 200
 
-        def __init__(self):
-            self.resize_args = None
-            self.saved = None
+        def __init__(self) -> None:
+            """Initialize placeholders for resize args."""
+            self.resize_args: Tuple[Tuple[int, int], Any] | None = None
+            self.saved: str | None = None
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Capture resize arguments and return self."""
             self.resize_args = (size, resample)
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Capture the save path."""
             self.saved = path
 
     dummy = DummyImage()
 
-    def fake_open(path):
+    def fake_open(path: str) -> DummyImage:
+        """Return the shared dummy image instance."""
         return dummy
 
+    def noop_visit_image(*_: Any) -> None:
+        """Disable base HTML image rendering for the test."""
+        return None
+
     monkeypatch.setattr(core.PIL.Image, "open", fake_open)
-    monkeypatch.setattr(core.HTMLTranslator, "visit_image", lambda *_: None)
+    monkeypatch.setattr(core.HTMLTranslator, "visit_image", noop_visit_image)
 
     core.ModifiedHTMLTranslator.visit_image(translator, node)
     assert dummy.resize_args[0] == (50, 25)
     assert dummy.saved.endswith("image.jpg")
 
 
-def test_modified_translator_autorotates_jpeg(monkeypatch, tmp_path):
+def test_modified_translator_autorotates_jpeg(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Apply EXIF-based autorotation for JPEGs."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -321,57 +384,73 @@ def test_modified_translator_autorotates_jpeg(monkeypatch, tmp_path):
     )
 
     class DummyImage:
+        """Stub JPEG image with EXIF orientation."""
+
         format = "JPEG"
         width = 100
         height = 50
 
-        def __init__(self):
-            self.ops = []
-            self.resize_args = None
-            self.saved = None
+        def __init__(self) -> None:
+            """Initialize tracking for operations and save calls."""
+            self.ops: list[Any] = []
+            self.resize_args: Tuple[Tuple[int, int], Any] | None = None
+            self.saved: str | None = None
 
-        def _getexif(self):
+        def _getexif(self) -> Dict[int, int]:
+            """Return a fake EXIF orientation map."""
             return {274: 6}
 
-        def transpose(self, op):
+        def transpose(self, op: Any) -> Any:
+            """Record transpose operations and return self."""
             self.ops.append(op)
             return self
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Capture resize arguments and return self."""
             self.resize_args = (size, resample)
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Capture the save path."""
             self.saved = path
 
     dummy = DummyImage()
 
-    def fake_open(path):
+    def fake_open(path: str) -> DummyImage:
+        """Return the shared dummy image instance."""
         return dummy
+
+    def noop_visit_image(*_: Any) -> None:
+        """Disable base HTML image rendering for the test."""
+        return None
 
     monkeypatch.setattr(core.PIL.Image, "open", fake_open)
     monkeypatch.setattr(core.PIL.ExifTags, "TAGS", {274: "Orientation"})
-    monkeypatch.setattr(core.HTMLTranslator, "visit_image", lambda *_: None)
+    monkeypatch.setattr(core.HTMLTranslator, "visit_image", noop_visit_image)
 
     core.ModifiedHTMLTranslator.visit_image(translator, node)
     assert dummy.ops == list(core.ModifiedHTMLTranslator.exiftrans[6])
     assert dummy.resize_args[0] == (50, 25)
 
 
-def test_cmdl_main_invokes_docutils(monkeypatch):
+def test_cmdl_main_invokes_docutils(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Call docutils publish_cmdline with expected args."""
     cmdl = importlib.import_module("rst4html.__cmdl__")
     docutils_core = importlib.import_module("docutils.core")
     locale_module = importlib.import_module("locale")
-    called = {}
+    called: Dict[str, Any] = {}
 
-    def fake_publish_cmdline(**kwargs):
+    def fake_publish_cmdline(**kwargs: Any) -> None:
+        """Capture publish_cmdline invocation arguments."""
         called.update(kwargs)
 
     monkeypatch.setattr(docutils_core, "publish_cmdline", fake_publish_cmdline)
     monkeypatch.setattr(docutils_core, "default_description", "default-desc")
 
-    def fake_setlocale(category, value):
+    def fake_setlocale(category: Any, value: Any) -> None:
+        """Capture locale settings for the test."""
         called["locale"] = (category, value)
 
     monkeypatch.setattr(locale_module, "setlocale", fake_setlocale)
@@ -383,56 +462,79 @@ def test_cmdl_main_invokes_docutils(monkeypatch):
     assert called["locale"][1] == ""
 
 
-def test_cmdl_main_run_as_script(monkeypatch):
+def test_cmdl_main_run_as_script(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Execute __cmdl__ main when run as a script."""
     import runpy
 
     docutils_core = importlib.import_module("docutils.core")
     locale_module = importlib.import_module("locale")
-    called = {}
+    called: Dict[str, Any] = {}
 
-    def fake_publish_cmdline(**kwargs):
+    def fake_publish_cmdline(**kwargs: Any) -> None:
+        """Capture publish_cmdline invocation arguments."""
         called.update(kwargs)
+
+    def noop_setlocale(*_: Any) -> None:
+        """Disable locale side effects for the test."""
+        return None
 
     monkeypatch.setattr(docutils_core, "publish_cmdline", fake_publish_cmdline)
     monkeypatch.setattr(docutils_core, "default_description", "default-desc")
-    monkeypatch.setattr(locale_module, "setlocale", lambda *_: None)
+    monkeypatch.setattr(locale_module, "setlocale", noop_setlocale)
 
     runpy.run_module("rst4html.__cmdl__", run_name="__main__")
     assert called["reader_name"] == "rst4html"
 
 
-def test_cmdl_main_uses_custom_reader_writer(monkeypatch):
+def test_cmdl_main_uses_custom_reader_writer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Pass custom reader and writer instances."""
     cmdl = importlib.import_module("rst4html.__cmdl__")
     docutils_core = importlib.import_module("docutils.core")
     locale_module = importlib.import_module("locale")
-    captured = {}
+    captured: Dict[str, Any] = {}
 
-    def fake_publish_cmdline(**kwargs):
+    def fake_publish_cmdline(**kwargs: Any) -> None:
+        """Capture publish_cmdline invocation arguments."""
         captured.update(kwargs)
+
+    def noop_setlocale(*_: Any) -> None:
+        """Disable locale side effects for the test."""
+        return None
 
     monkeypatch.setattr(docutils_core, "publish_cmdline", fake_publish_cmdline)
     monkeypatch.setattr(docutils_core, "default_description", "default-desc")
-    monkeypatch.setattr(locale_module, "setlocale", lambda *_: None)
+    monkeypatch.setattr(locale_module, "setlocale", noop_setlocale)
     cmdl.main()
 
     assert isinstance(captured["reader"], core.Reader)
     assert isinstance(captured["writer"], core.Writer)
 
 
-def test_imports_with_pil_available(monkeypatch):
+def test_imports_with_pil_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Load module when PIL is available."""
-    def importer(original, name, globals, locals, fromlist, level):
-        return original(name, globals, locals, fromlist, level)
+
+    def importer(original: Any, name: str, *args: Any, **kwargs: Any) -> Any:
+        """Use the standard import path."""
+        return original(name, *args, **kwargs)
 
     module = load_rst4html_module(monkeypatch, importer)
     assert module.PIL is not None
 
 
-def test_imports_with_legacy_pil(monkeypatch):
+def test_imports_with_legacy_pil(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Fallback to legacy PIL imports when needed."""
+
     class DummyImage:
+        """Legacy PIL image stub with transformation constants."""
+
         FLIP_LEFT_RIGHT = object()
         ROTATE_180 = object()
         FLIP_TOP_BOTTOM = object()
@@ -441,79 +543,96 @@ def test_imports_with_legacy_pil(monkeypatch):
         ROTATE_90 = object()
 
     class DummyExifTags:
-        TAGS = {}
+        """Legacy PIL ExifTags stub."""
 
-    def importer(original, name, globals, locals, fromlist, level):
+        TAGS: Dict[int, str] = {}
+
+    def importer(
+        original: Any,
+        name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Simulate legacy PIL module locations."""
         if name.startswith("PIL"):
             raise ImportError("no PIL")
         if name == "Image":
             return DummyImage
         if name == "ExifTags":
             return DummyExifTags
-        return original(name, globals, locals, fromlist, level)
+        return original(name, *args, **kwargs)
 
     module = load_rst4html_module(monkeypatch, importer)
     assert module.PIL.Image is DummyImage
     assert module.PIL.ExifTags is DummyExifTags
 
 
-def test_imports_with_no_pil(monkeypatch):
+def test_imports_with_no_pil(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Fail initialization when no PIL modules exist."""
-    def importer(original, name, globals, locals, fromlist, level):
+
+    def importer(
+        original: Any,
+        name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """Force ImportError for PIL-related imports."""
         if name.startswith("PIL") or name in {"Image", "ExifTags"}:
             raise ImportError("no PIL")
-        return original(name, globals, locals, fromlist, level)
+        return original(name, *args, **kwargs)
 
     with pytest.raises(AttributeError):
         load_rst4html_module(monkeypatch, importer)
 
 
-def test_mosaic_chunks_single_column_when_no_args():
+def test_mosaic_chunks_single_column_when_no_args() -> None:
     """Chunk images into single-column rows when no args provided."""
     images = ["a.png", "b.png", "c.png"]
     rows = core._chunk_images(images, [])
     assert rows == [["a.png"], ["b.png"], ["c.png"]]
 
 
-def test_mosaic_chunks_adds_remaining_as_row_when_args_short():
+def test_mosaic_chunks_adds_remaining_as_row_when_args_short() -> None:
     """Chunk images and append remaining images as one row."""
     images = ["a.png", "b.png", "c.png", "d.png", "e.png"]
     rows = core._chunk_images(images, [2])
     assert rows == [["a.png", "b.png"], ["c.png", "d.png", "e.png"]]
 
 
-def test_mosaic_chunks_truncates_when_args_too_long():
+def test_mosaic_chunks_truncates_when_args_too_long() -> None:
     """Chunk images using args until images are exhausted."""
     images = ["a.png", "b.png", "c.png"]
     rows = core._chunk_images(images, [2, 2, 1])
     assert rows == [["a.png", "b.png"], ["c.png"]]
 
 
-def test_mosaic_parse_arguments_accepts_positive_counts():
+def test_mosaic_parse_arguments_accepts_positive_counts() -> None:
     """Parse mosaic arguments into positive integers."""
     counts = core._parse_mosaic_arguments(["1", "3"])
     assert counts == [1, 3]
 
 
-def test_mosaic_parse_arguments_rejects_zero():
+def test_mosaic_parse_arguments_rejects_zero() -> None:
     """Reject zero or negative mosaic arguments."""
     with pytest.raises(ValueError):
         core._parse_mosaic_arguments(["0"])
 
 
-def test_mosaic_parse_arguments_rejects_negative():
+def test_mosaic_parse_arguments_rejects_negative() -> None:
     """Reject negative mosaic arguments."""
     with pytest.raises(ValueError):
         core._parse_mosaic_arguments(["-1"])
 
 
-def test_mosaic_parse_arguments_rejects_non_integer():
+def test_mosaic_parse_arguments_rejects_non_integer() -> None:
     """Reject non-integer mosaic arguments."""
     with pytest.raises(ValueError):
         core._parse_mosaic_arguments(["two"])
 
 
-def test_mosaic_directive_builds_rows_and_caption():
+def test_mosaic_directive_builds_rows_and_caption() -> None:
     """Parse mosaic directive into row containers and caption."""
     content = (
         ".. mosaic:: 2 1\n"
@@ -526,18 +645,26 @@ def test_mosaic_directive_builds_rows_and_caption():
     )
     document = build_mosaic_doctree(content)
     containers = list(document.findall(nodes.container))
-    rows = [node for node in containers if "mosaic-row" in node.get("classes", [])]
+    rows = [
+        node for node in containers if "mosaic-row" in node.get("classes", [])
+    ]
     assert len(rows) == 2
     assert "figure" in rows[0].get("classes", [])
     assert rows[0]["mosaic_width"] == "80%"
-    assert len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
-    assert len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
+    assert (
+        len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
+    )
+    assert (
+        len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
+    )
     paragraphs = list(document.findall(nodes.paragraph))
-    caption = next(node for node in paragraphs if "caption" in node.get("classes", []))
+    caption = next(
+        node for node in paragraphs if "caption" in node.get("classes", [])
+    )
     assert "2 1" not in caption.astext()
 
 
-def test_mosaic_directive_reports_mismatch_and_renders():
+def test_mosaic_directive_reports_mismatch_and_renders() -> None:
     """Report mismatched arguments but still build mosaic rows."""
     content = (
         ".. mosaic:: 2 2\n"
@@ -549,13 +676,19 @@ def test_mosaic_directive_reports_mismatch_and_renders():
     errors = list(document.findall(nodes.system_message))
     assert any("mosaic directive" in node.astext() for node in errors)
     containers = list(document.findall(nodes.container))
-    rows = [node for node in containers if "mosaic-row" in node.get("classes", [])]
+    rows = [
+        node for node in containers if "mosaic-row" in node.get("classes", [])
+    ]
     assert len(rows) == 2
-    assert len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
-    assert len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
+    assert (
+        len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
+    )
+    assert (
+        len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
+    )
 
 
-def test_mosaic_directive_defaults_width_and_skips_width_caption():
+def test_mosaic_directive_defaults_width_and_skips_width_caption() -> None:
     """Default width to 100% and ignore width line in caption."""
     content = (
         ".. mosaic::\n"
@@ -567,17 +700,21 @@ def test_mosaic_directive_defaults_width_and_skips_width_caption():
     )
     document = build_mosaic_doctree(content)
     containers = list(document.findall(nodes.container))
-    rows = [node for node in containers if "mosaic-row" in node.get("classes", [])]
+    rows = [
+        node for node in containers if "mosaic-row" in node.get("classes", [])
+    ]
     assert rows[0]["mosaic_width"] == "60%"
     assert rows[0]["mosaic_border"] == "3%"
     paragraphs = list(document.findall(nodes.paragraph))
-    caption = next(node for node in paragraphs if "caption" in node.get("classes", []))
+    caption = next(
+        node for node in paragraphs if "caption" in node.get("classes", [])
+    )
     caption_text = caption.astext()
     assert ":width:" not in caption_text
     assert ":border:" not in caption_text
 
 
-def test_mosaic_directive_uses_specified_width_line():
+def test_mosaic_directive_uses_specified_width_line() -> None:
     """Use width parsed from content lines."""
     content = (
         ".. mosaic::\n"
@@ -586,12 +723,14 @@ def test_mosaic_directive_uses_specified_width_line():
     )
     document = build_mosaic_doctree(content)
     containers = list(document.findall(nodes.container))
-    rows = [node for node in containers if "mosaic-row" in node.get("classes", [])]
+    rows = [
+        node for node in containers if "mosaic-row" in node.get("classes", [])
+    ]
     assert rows[0]["mosaic_width"] == "75%"
     assert rows[0]["mosaic_border"] == "2%"
 
 
-def test_mosaic_directive_no_caption_when_only_img_and_width():
+def test_mosaic_directive_no_caption_when_only_img_and_width() -> None:
     """Do not create caption when no caption content exists."""
     content = (
         ".. mosaic::\n"
@@ -603,22 +742,26 @@ def test_mosaic_directive_no_caption_when_only_img_and_width():
     captions = [
         node for node in containers if isinstance(node, nodes.paragraph)
     ]
-    captions = [node for node in captions if "caption" in node.get("classes", [])]
+    captions = [
+        node for node in captions if "caption" in node.get("classes", [])
+    ]
     assert not captions
 
 
-def test_mosaic_directive_invalid_argument_reports_error_only():
+def test_mosaic_directive_invalid_argument_reports_error_only() -> None:
     """Invalid arguments return a system message node."""
     content = ".. mosaic:: 0\n   :img: image1.png\n"
     document = build_mosaic_doctree(content)
     errors = list(document.findall(nodes.system_message))
     assert errors
     containers = list(document.findall(nodes.container))
-    rows = [node for node in containers if "mosaic-row" in node.get("classes", [])]
+    rows = [
+        node for node in containers if "mosaic-row" in node.get("classes", [])
+    ]
     assert not rows
 
 
-def test_modified_translator_mosaic_caption_paragraph():
+def test_modified_translator_mosaic_caption_paragraph() -> None:
     """Render mosaic captions as paragraph tags."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -634,7 +777,10 @@ def test_modified_translator_mosaic_caption_paragraph():
     assert html == '<p class="caption"></p>\n'
 
 
-def test_modified_translator_mosaic_row_renders_images(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_row_renders_images(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Render mosaic rows by resizing images to a shared height."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -651,18 +797,28 @@ def test_modified_translator_mosaic_row_renders_images(monkeypatch, tmp_path):
     row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image with fixed dimensions for mosaics."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store the provided width and height."""
             self.width = width
             self.height = height
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Update dimensions and return self."""
             self.width, self.height = size
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
-    sequence = [DummyImage(100, 50), DummyImage(50, 50), DummyImage(100, 50), DummyImage(50, 50)]
+    sequence = [
+        DummyImage(100, 50),
+        DummyImage(50, 50),
+        DummyImage(100, 50),
+        DummyImage(50, 50),
+    ]
     monkeypatch.setattr(core.PIL.Image, "open", lambda *_: sequence.pop(0))
 
     with pytest.raises(nodes.SkipNode):
@@ -680,7 +836,9 @@ def test_modified_translator_mosaic_row_renders_images(monkeypatch, tmp_path):
     assert "height:" not in html
 
 
-def test_modified_translator_mosaic_row_skips_when_no_images(tmp_path):
+def test_modified_translator_mosaic_row_skips_when_no_images(
+    tmp_path: Any,
+) -> None:
     """Handle mosaic rows without images gracefully."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -701,7 +859,10 @@ def test_modified_translator_mosaic_row_skips_when_no_images(tmp_path):
     assert "<div class=\"mosaic\"" in html
 
 
-def test_modified_translator_mosaic_border_px(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_border_px(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Convert mosaic border px to percent."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -718,14 +879,19 @@ def test_modified_translator_mosaic_border_px(monkeypatch, tmp_path):
     row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image for border calculations."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store dimensions for border tests."""
             self.width = width
             self.height = height
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
     sequence = [DummyImage(100, 100), DummyImage(100, 100)]
@@ -739,7 +905,10 @@ def test_modified_translator_mosaic_border_px(monkeypatch, tmp_path):
     assert "--ar: 1.0000;" in html
 
 
-def test_modified_translator_mosaic_no_upscale(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_no_upscale(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Avoid upscaling mosaic images past their original size."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -756,16 +925,21 @@ def test_modified_translator_mosaic_no_upscale(monkeypatch, tmp_path):
     row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image that tracks resize usage."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store dimensions and resize flag."""
             self.width = width
             self.height = height
             self.resized = False
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Mark the image as resized and return self."""
             self.resized = True
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
     dummy = DummyImage(200, 100)
@@ -779,7 +953,10 @@ def test_modified_translator_mosaic_no_upscale(monkeypatch, tmp_path):
     assert dummy.resized is False
 
 
-def test_modified_translator_mosaic_border_invalid_defaults(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_border_invalid_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Fallback to default border when border value is invalid."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -796,14 +973,19 @@ def test_modified_translator_mosaic_border_invalid_defaults(monkeypatch, tmp_pat
     row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image for invalid border tests."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store dimensions for border tests."""
             self.width = width
             self.height = height
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
     sequence = [DummyImage(100, 50), DummyImage(50, 50)]
@@ -816,7 +998,10 @@ def test_modified_translator_mosaic_border_invalid_defaults(monkeypatch, tmp_pat
     assert "margin-right" not in html
 
 
-def test_modified_translator_mosaic_border_negative_clamped(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_border_negative_clamped(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Clamp negative border percent to zero."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -833,14 +1018,19 @@ def test_modified_translator_mosaic_border_negative_clamped(monkeypatch, tmp_pat
     row += nodes.image(uri=str(tmp_path / "image2.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image for negative border tests."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store dimensions for border tests."""
             self.width = width
             self.height = height
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
     sequence = [DummyImage(100, 100), DummyImage(100, 100)]
@@ -854,7 +1044,10 @@ def test_modified_translator_mosaic_border_negative_clamped(monkeypatch, tmp_pat
     assert "margin-bottom" not in html
 
 
-def test_modified_translator_mosaic_zero_height(monkeypatch, tmp_path):
+def test_modified_translator_mosaic_zero_height(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
     """Handle images with zero height safely."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -870,14 +1063,19 @@ def test_modified_translator_mosaic_zero_height(monkeypatch, tmp_path):
     row += nodes.image(uri=str(tmp_path / "image1.png"))
 
     class DummyImage:
-        def __init__(self, width, height):
+        """Stub image for zero-height tests."""
+
+        def __init__(self, width: int, height: int) -> None:
+            """Store dimensions for zero-height tests."""
             self.width = width
             self.height = height
 
-        def resize(self, size, resample=None):
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
             return self
 
-        def save(self, path):
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
             return None
 
     dummy = DummyImage(100, 0)
