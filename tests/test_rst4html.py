@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Tuple
 
 import pytest
 from docutils import nodes
-from docutils.frontend import OptionParser
+from docutils import frontend
 from docutils.io import StringInput
 from docutils.parsers.rst import Parser
 from docutils.utils import new_document
@@ -16,10 +16,8 @@ from docutils.utils import new_document
 core = importlib.import_module("rst4html.rst4html")
 
 
-def load_rst4html_module(
-    monkeypatch: pytest.MonkeyPatch,
-    importer: Callable[..., Any],
-) -> Any:
+def load_rst4html_module(monkeypatch: pytest.MonkeyPatch,
+                         importer: Callable[..., Any],) -> Any:
     """Import the module via a custom import hook for PIL scenarios."""
     import builtins
     import importlib.util
@@ -67,13 +65,13 @@ def load_rst4html_module(
 
 def make_reader_settings(reader: Any, parser: Any) -> Any:
     """Construct default reader settings for tests."""
-    return OptionParser(components=(reader, parser)).get_default_values()
+    return frontend.get_default_settings(reader, parser)
 
 
 def build_mosaic_doctree(content: str) -> nodes.document:
     """Parse mosaic directives into a docutils document tree."""
     parser = Parser()
-    settings = OptionParser(components=(parser,)).get_default_values()
+    settings = frontend.get_default_settings(parser)
     document = new_document("test", settings=settings)
     parser.parse(content, document)
     return document
@@ -174,10 +172,8 @@ def test_writer_creates_target_dir_and_writes(
     assert called["document"] is document
 
 
-def test_writer_keeps_empty_target_dir(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+def test_writer_keeps_empty_target_dir(monkeypatch: pytest.MonkeyPatch,
+                                       tmp_path: Any) -> None:
     """Allow existing empty target directories."""
     imgtargetdir = tmp_path / "imgs"
     imgtargetdir.mkdir()
@@ -217,8 +213,7 @@ def test_modified_translator_requires_integer_targetlinewidth() -> None:
 
 
 def test_modified_translator_rejects_unknown_width(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
     """Reject unsupported width formats."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -255,9 +250,8 @@ def test_modified_translator_rejects_unknown_width(
 
 
 def test_modified_translator_scales_percent_width(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                    monkeypatch: pytest.MonkeyPatch,
+                                    tmp_path: Any) -> None:
     """Scale images based on percent widths."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -311,9 +305,8 @@ def test_modified_translator_scales_percent_width(
 
 
 def test_modified_translator_scales_px_width(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                monkeypatch: pytest.MonkeyPatch,
+                                tmp_path: Any) -> None:
     """Scale images based on pixel widths."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -367,9 +360,8 @@ def test_modified_translator_scales_px_width(
 
 
 def test_modified_translator_autorotates_jpeg(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                    monkeypatch: pytest.MonkeyPatch,
+                                    tmp_path: Any) -> None:
     """Apply EXIF-based autorotation for JPEGs."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -433,9 +425,7 @@ def test_modified_translator_autorotates_jpeg(
     assert dummy.resize_args[0] == (50, 25)
 
 
-def test_cmdl_main_invokes_docutils(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_cmdl_main_invokes_docutils(monkeypatch: pytest.MonkeyPatch) -> None:
     """Call docutils publish_cmdline with expected args."""
     cmdl = importlib.import_module("rst4html.__cmdl__")
     docutils_core = importlib.import_module("docutils.core")
@@ -462,9 +452,7 @@ def test_cmdl_main_invokes_docutils(
     assert called["locale"][1] == ""
 
 
-def test_cmdl_main_run_as_script(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_cmdl_main_run_as_script(monkeypatch: pytest.MonkeyPatch) -> None:
     """Execute __cmdl__ main when run as a script."""
     import runpy
 
@@ -489,8 +477,7 @@ def test_cmdl_main_run_as_script(
 
 
 def test_cmdl_main_uses_custom_reader_writer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
     """Pass custom reader and writer instances."""
     cmdl = importlib.import_module("rst4html.__cmdl__")
     docutils_core = importlib.import_module("docutils.core")
@@ -527,9 +514,7 @@ def test_imports_with_pil_available(
     assert module.PIL is not None
 
 
-def test_imports_with_legacy_pil(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_imports_with_legacy_pil(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fallback to legacy PIL imports when needed."""
 
     class DummyImage:
@@ -567,17 +552,10 @@ def test_imports_with_legacy_pil(
     assert module.PIL.ExifTags is DummyExifTags
 
 
-def test_imports_with_no_pil(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_imports_with_no_pil(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail initialization when no PIL modules exist."""
 
-    def importer(
-        original: Any,
-        name: str,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any:
+    def importer(original: Any, name: str, *args: Any, **kwargs: Any,) -> Any:
         """Force ImportError for PIL-related imports."""
         if name.startswith("PIL") or name in {"Image", "ExifTags"}:
             raise ImportError("no PIL")
@@ -782,9 +760,8 @@ def test_modified_translator_mosaic_caption_paragraph() -> None:
 
 
 def test_modified_translator_mosaic_row_renders_images(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                        monkeypatch: pytest.MonkeyPatch,
+                                        tmp_path: Any) -> None:
     """Render mosaic rows by resizing images to a shared height."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -841,8 +818,7 @@ def test_modified_translator_mosaic_row_renders_images(
 
 
 def test_modified_translator_mosaic_row_skips_when_no_images(
-    tmp_path: Any,
-) -> None:
+                                                        tmp_path: Any) -> None:
     """Handle mosaic rows without images gracefully."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -863,10 +839,8 @@ def test_modified_translator_mosaic_row_skips_when_no_images(
     assert "<div class=\"mosaic\"" in html
 
 
-def test_modified_translator_mosaic_border_px(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+def test_modified_translator_mosaic_border_px(monkeypatch: pytest.MonkeyPatch,
+                                              tmp_path: Any) -> None:
     """Convert mosaic border px to percent."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -909,10 +883,8 @@ def test_modified_translator_mosaic_border_px(
     assert "--ar: 1.0000;" in html
 
 
-def test_modified_translator_mosaic_no_upscale(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+def test_modified_translator_mosaic_no_upscale(monkeypatch: pytest.MonkeyPatch,
+                                               tmp_path: Any) -> None:
     """Avoid upscaling mosaic images past their original size."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -958,9 +930,8 @@ def test_modified_translator_mosaic_no_upscale(
 
 
 def test_modified_translator_mosaic_border_invalid_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
     """Fallback to default border when border value is invalid."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1003,9 +974,8 @@ def test_modified_translator_mosaic_border_invalid_defaults(
 
 
 def test_modified_translator_mosaic_border_negative_clamped(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
     """Clamp negative border percent to zero."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1049,9 +1019,8 @@ def test_modified_translator_mosaic_border_negative_clamped(
 
 
 def test_modified_translator_mosaic_zero_height(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
-) -> None:
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
     """Handle images with zero height safely."""
     translator = core.ModifiedHTMLTranslator.__new__(
         core.ModifiedHTMLTranslator
@@ -1092,3 +1061,328 @@ def test_modified_translator_mosaic_zero_height(
     assert "--ar: 0.0000;" in html
     assert "width:" not in html
     assert "height:" not in html
+
+
+def test_mosaic_chunks_breaks_when_no_remaining() -> None:
+    """Stop chunking once all images are consumed."""
+    images = ["a.png", "b.png"]
+    rows = core._chunk_images(images, [1, 1, 1])
+    assert rows == [["a.png"], ["b.png"]]
+
+
+def test_modified_translator_mosaic_width_numeric(
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
+    """Parse numeric mosaic width values."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "300"
+    row["mosaic_border"] = "10px"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for numeric width test."""
+
+        def __init__(self) -> None:
+            """Set sample dimensions."""
+            self.width = 100
+            self.height = 50
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: DummyImage())
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert "<div class=\"mosaic\">" in "".join(translator.body)
+
+
+def test_modified_translator_mosaic_width_px(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    """Parse pixel mosaic width values."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "300px"
+    row["mosaic_border"] = "2%"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for pixel width test."""
+
+        def __init__(self) -> None:
+            """Set sample dimensions."""
+            self.width = 100
+            self.height = 50
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: DummyImage())
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert "<div class=\"mosaic\">" in "".join(translator.body)
+
+
+def test_modified_translator_mosaic_width_invalid(
+                                        monkeypatch: pytest.MonkeyPatch,
+                                        tmp_path: Any) -> None:
+    """Ignore invalid mosaic width values."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "bad"
+    row["mosaic_border"] = "2%"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for invalid width test."""
+
+        def __init__(self) -> None:
+            """Set sample dimensions."""
+            self.width = 100
+            self.height = 50
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: DummyImage())
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert "<div class=\"mosaic\">" in "".join(translator.body)
+
+
+def test_modified_translator_mosaic_border_invalid_percent(
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
+    """Fallback when border percent is invalid."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "100%"
+    row["mosaic_border"] = "bad%"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for invalid percent border."""
+
+        def __init__(self) -> None:
+            """Set sample dimensions."""
+            self.width = 100
+            self.height = 50
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: DummyImage())
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert "<div class=\"mosaic\">" in "".join(translator.body)
+
+
+def test_modified_translator_mosaic_border_invalid_px(
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
+    """Fallback when border px is invalid."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "100%"
+    row["mosaic_border"] = "badpx"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for invalid px border."""
+
+        def __init__(self) -> None:
+            """Set sample dimensions."""
+            self.width = 100
+            self.height = 50
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Return self without changes."""
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: DummyImage())
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert "<div class=\"mosaic\">" in "".join(translator.body)
+
+
+def test_modified_translator_mosaic_resizes_large_images(
+                                            monkeypatch: pytest.MonkeyPatch,
+                                            tmp_path: Any) -> None:
+    """Resize mosaic images that exceed the max width."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    row = nodes.container(classes=["mosaic-row"])
+    row["mosaic_width"] = "100%"
+    row["mosaic_border"] = "2%"
+    row += nodes.image(uri=str(tmp_path / "image1.png"))
+
+    class DummyImage:
+        """Stub image for max width resizing."""
+
+        def __init__(self) -> None:
+            """Set oversize dimensions."""
+            self.width = 500
+            self.height = 250
+            self.resize_args: Tuple[int, int] | None = None
+
+        def resize(self, size: Tuple[int, int], resample: Any = None) -> Any:
+            """Capture resize arguments and return self."""
+            self.resize_args = size
+            return self
+
+        def save(self, path: str) -> None:
+            """Pretend to save the image."""
+            return None
+
+    dummy = DummyImage()
+    monkeypatch.setattr(core.PIL.Image, "open", lambda *_: dummy)
+
+    with pytest.raises(nodes.SkipNode):
+        core.ModifiedHTMLTranslator.visit_container(translator, row)
+
+    assert dummy.resize_args == (425, 212)
+
+
+def test_modified_translator_mosaic_caption_container(tmp_path: Any) -> None:
+    """Render mosaic caption containers with custom markup."""
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    translator.settings = types.SimpleNamespace(
+        imgtargetdir=str(tmp_path),
+        targetlinewidth=200,
+    )
+    translator.body = []
+    node = nodes.container(classes=["mosaic-caption"])
+
+    core.ModifiedHTMLTranslator.visit_container(translator, node)
+
+    assert translator.body == [
+        '<div class="docutils container mosaic-caption">'
+    ]
+
+
+def test_modified_translator_delegates_to_base(
+                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """Delegate to base translator when no mosaic special cases apply."""
+    calls: list[str] = []
+
+    def fake_visit_container(self: Any, node: nodes.Node) -> None:
+        """Track container visits."""
+        calls.append("visit_container")
+
+    def fake_depart_container(self: Any, node: nodes.Node) -> None:
+        """Track container departures."""
+        calls.append("depart_container")
+
+    def fake_visit_paragraph(self: Any, node: nodes.paragraph) -> None:
+        """Track paragraph visits."""
+        calls.append("visit_paragraph")
+
+    def fake_depart_paragraph(self: Any, node: nodes.paragraph) -> None:
+        """Track paragraph departures."""
+        calls.append("depart_paragraph")
+
+    monkeypatch.setattr(core.HTMLTranslator, "visit_container",
+                        fake_visit_container)
+    monkeypatch.setattr(core.HTMLTranslator, "depart_container",
+                        fake_depart_container)
+    monkeypatch.setattr(core.HTMLTranslator, "visit_paragraph",
+                        fake_visit_paragraph)
+    monkeypatch.setattr(core.HTMLTranslator, "depart_paragraph",
+                        fake_depart_paragraph)
+
+    translator = core.ModifiedHTMLTranslator.__new__(
+        core.ModifiedHTMLTranslator
+    )
+    container = nodes.container(classes=["regular"])
+    paragraph = nodes.paragraph()
+
+    core.ModifiedHTMLTranslator.visit_container(translator, container)
+    core.ModifiedHTMLTranslator.depart_container(translator, container)
+    core.ModifiedHTMLTranslator.visit_paragraph(translator, paragraph)
+    core.ModifiedHTMLTranslator.depart_paragraph(translator, paragraph)
+
+    assert calls == [
+        "visit_container",
+        "depart_container",
+        "visit_paragraph",
+        "depart_paragraph",
+    ]
