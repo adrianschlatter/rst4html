@@ -26,25 +26,8 @@ from .utils import export
 from json import loads, JSONDecodeError
 from os.path import join, basename, exists, isdir
 from os import mkdir, listdir
-
-# check for the Python Imaging Library
-try:
-    import PIL.Image
-    import PIL.ExifTags
-except ImportError:
-    try:  # sometimes PIL modules are put in PYTHONPATH's root
-        import Image
-        import ExifTags
-
-        class PIL(object):
-            """Fallback wrapper for legacy PIL modules."""
-
-            pass  # dummy wrapper
-
-        PIL.Image = Image
-        PIL.ExifTags = ExifTags
-    except ImportError:
-        PIL = None
+import PIL.Image
+import PIL.ExifTags
 
 
 DEFAULT_MOSAIC_WIDTH = '100%'
