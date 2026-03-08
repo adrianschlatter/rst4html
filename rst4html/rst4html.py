@@ -128,6 +128,24 @@ def _parse_mosaic_border(mosaic_border: Any, width: int) -> float:
     return border_percent
 
 
+def _prepare_mosaic_image(
+    image: nodes.image,
+    imgtargetdir: str,
+    max_width: int,
+) -> Tuple[str, float]:
+    """Copy and resize mosaic images as needed."""
+    img = PIL.Image.open(image['uri'])
+    ratio = img.width / img.height if img.height else 0
+    newuri = join(imgtargetdir, basename(image['uri']))
+    if img.width > max_width and img.height:
+        newwidth = max_width
+        newheight = int(newwidth / ratio) if ratio else img.height
+        img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)
+    img.save(newuri)
+    image['uri'] = newuri
+    return newuri, ratio
+
+
 class Mosaic(Directive):
     """Directive that renders image mosaics with optional captions."""
 
@@ -329,27 +347,18 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             border_percent = _parse_mosaic_border(mosaic_border, width)
 
             images = [child for child in node if isinstance(child, nodes.image)]
-            image_infos: List[Tuple[nodes.image, Any, float]] = []
+            image_infos: List[Tuple[nodes.image, str, float]] = []
+            max_width = 425
             for image in images:
-                img = PIL.Image.open(image['uri'])
-                ratio = img.width / img.height if img.height else 0
-                image_infos.append((image, img, ratio))
+                newuri, ratio = _prepare_mosaic_image(
+                    image,
+                    self.settings.imgtargetdir,
+                    max_width,
+                )
+                image_infos.append((image, newuri, ratio))
 
             self.body.append('<div class="mosaic">\n')
-            for index, (image, img, ratio) in enumerate(image_infos):
-                newuri = join(
-                    self.settings.imgtargetdir,
-                    basename(image['uri']),
-                )
-                newwidth = img.width
-                newheight = img.height
-                max_width = 425
-                if img.width > max_width and img.height:
-                    newwidth = max_width
-                    newheight = int(newwidth / ratio) if ratio else img.height
-                    img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)
-                img.save(newuri)
-                image['uri'] = newuri
+            for index, (image, newuri, ratio) in enumerate(image_infos):
                 self.body.append(
                     '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
                         newuri,
