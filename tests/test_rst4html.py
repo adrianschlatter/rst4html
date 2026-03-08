@@ -651,12 +651,14 @@ def test_mosaic_directive_builds_rows_and_caption() -> None:
     assert len(rows) == 2
     assert "figure" in rows[0].get("classes", [])
     assert rows[0]["mosaic_width"] == "80%"
-    assert (
-        len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
-    )
-    assert (
-        len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
-    )
+    images_in_row_0 = [
+        child for child in rows[0] if isinstance(child, nodes.image)
+    ]
+    images_in_row_1 = [
+        child for child in rows[1] if isinstance(child, nodes.image)
+    ]
+    assert len(images_in_row_0) == 2
+    assert len(images_in_row_1) == 1
     paragraphs = list(document.findall(nodes.paragraph))
     caption = next(
         node for node in paragraphs if "caption" in node.get("classes", [])
@@ -680,12 +682,14 @@ def test_mosaic_directive_reports_mismatch_and_renders() -> None:
         node for node in containers if "mosaic-row" in node.get("classes", [])
     ]
     assert len(rows) == 2
-    assert (
-        len([child for child in rows[0] if isinstance(child, nodes.image)]) == 2
-    )
-    assert (
-        len([child for child in rows[1] if isinstance(child, nodes.image)]) == 1
-    )
+    images_in_row_0 = [
+        child for child in rows[0] if isinstance(child, nodes.image)
+    ]
+    images_in_row_1 = [
+        child for child in rows[1] if isinstance(child, nodes.image)
+    ]
+    assert len(images_in_row_0) == 2
+    assert len(images_in_row_1) == 1
 
 
 def test_mosaic_directive_defaults_width_and_skips_width_caption() -> None:
