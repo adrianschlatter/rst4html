@@ -14,6 +14,7 @@ from __future__ import annotations
 
 # flake8: noqa: W504
 
+from math import floor
 from typing import Any, Dict, List, Sequence, Tuple
 
 from docutils import nodes
@@ -32,8 +33,6 @@ import PIL.ExifTags
 
 DEFAULT_MOSAIC_WIDTH = '100%'
 DEFAULT_MOSAIC_BORDER = '2%'
-DEFAULT_MOSAIC_BORDER_PERCENT = 2.0
-MOSAIC_MAX_WIDTH = 425
 
 
 def _parse_mosaic_arguments(arguments: Sequence[str]) -> List[int]:
@@ -80,41 +79,189 @@ def _chunk_images(imgs: Sequence[str], counts: Sequence[int]) -> List[List[str]]
 
 def _parse_mosaic_width(mosaic_width: Any, targetlinewidth: int) -> int:
     """Parse mosaic width values into pixels."""
+    if type(targetlinewidth) != int or targetlinewidth <= 0:
+        raise TypeError('You need to specify a positive integer for --targetlinewidth')
+
     width = targetlinewidth
-    if isinstance(mosaic_width, str) and mosaic_width.endswith('%'):
-        width = int(float(mosaic_width[:-1]) * 1e-2 * width)
-    elif isinstance(mosaic_width, str) and mosaic_width.endswith('px'):
-        width = int(mosaic_width[:-2])
+    if isinstance(mosaic_width, str):
+        value = mosaic_width.strip()
+        try:
+            if value.endswith('%'):
+                percent = float(value[:-1])
+                if percent <= 0:
+                    raise ValueError('mosaic width must be greater than 0')
+                width = int(targetlinewidth * percent * 1e-2)
+            elif value.endswith('px'):
+                pixels = float(value[:-2])
+                if pixels <= 0:
+                    raise ValueError('mosaic width must be greater than 0')
+                width = int(pixels)
+            else:
+                pixels = float(value)
+                if pixels <= 0:
+                    raise ValueError('mosaic width must be greater than 0')
+                width = int(pixels)
+        except ValueError:
+            width = targetlinewidth
     else:
         try:
-            width = int(mosaic_width)
+            pixels = int(mosaic_width)
+            if pixels <= 0:
+                raise ValueError
+            width = pixels
         except (TypeError, ValueError):
-            pass
+            width = targetlinewidth
+
     return width
 
 
 def _parse_mosaic_border(mosaic_border: Any, width: int) -> float:
     """Parse mosaic border values into percent."""
-    border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
-    if isinstance(mosaic_border, str) and mosaic_border.endswith('%'):
+    if width <= 0:
+        raise ValueError('mosaic width must be greater than 0')
+
+    border_percent = 2.0
+    if isinstance(mosaic_border, str):
+        value = mosaic_border.strip()
         try:
-            border_percent = float(mosaic_border[:-1])
+            if value.endswith('%'):
+                border_percent = float(value[:-1])
+            elif value.endswith('px'):
+                border_px = float(value[:-2])
+                border_percent = border_px / width * 100
+            else:
+                border_percent = float(value)
         except ValueError:
-            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
-    elif isinstance(mosaic_border, str) and mosaic_border.endswith('px'):
-        try:
-            border_px = float(mosaic_border[:-2])
-            border_percent = (border_px / width * 100) if width else 0.0
-        except ValueError:
-            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
+            border_percent = 2.0
     else:
         try:
             border_percent = float(mosaic_border)
         except (TypeError, ValueError):
-            border_percent = DEFAULT_MOSAIC_BORDER_PERCENT
+            border_percent = 2.0
+
     if border_percent < 0:
         border_percent = 0.0
     return border_percent
+
+
+def _calculate_mosaic_image_geometry(
+    image_dimensions: Sequence[Tuple[int, int]],
+    mosaic_width: int,
+    border_percent: float,
+) -> List[Tuple[int, int]]:
+    """Compute image widths and heights from the CSS sizing contract."""
+    if mosaic_width <= 0:
+        raise ValueError('mosaic width must be greater than 0')
+    if border_percent < 0:
+        raise ValueError('mosaic border cannot be negative')
+
+    if not image_dimensions:
+        return []
+
+    image_count = len(image_dimensions)
+    gap_count = image_count - 1
+    gap_width = floor(mosaic_width * border_percent * 1e-2)
+    gaps_total = gap_width * gap_count
+    available_width = mosaic_width - gaps_total
+    if available_width <= 0:
+        raise ValueError('mosaic border leaves no room for images')
+
+    aspect_ratios = [
+        (width / height) if width > 0 and height > 0 else 0.0
+        for width, height in image_dimensions
+    ]
+
+    positive_ratios = [ratio for ratio in aspect_ratios if ratio > 0]
+    if not positive_ratios:
+        return [(width, height) for width, height in image_dimensions]
+
+    row_height = max(1, int(available_width / sum(positive_ratios)))
+
+    constrained_height = row_height
+    for ratio, (source_width, source_height) in zip(aspect_ratios, image_dimensions):
+        if ratio <= 0 or source_width <= 0 or source_height <= 0:
+            continue
+        max_height = int(source_width / ratio)
+        constrained_height = min(constrained_height, max_height)
+
+    desired_widths: List[int] = []
+    for ratio, (source_width, source_height) in zip(aspect_ratios, image_dimensions):
+        if ratio <= 0 or source_width <= 0 or source_height <= 0:
+            desired_widths.append(source_width)
+            continue
+        width = max(1, min(source_width, int(constrained_height * ratio)))
+        desired_widths.append(width)
+
+    total_width = sum(desired_widths)
+    remaining = available_width - total_width
+    if remaining > 0:
+        for index in range(image_count):
+            source_width = image_dimensions[index][0]
+            if desired_widths[index] < source_width:
+                room = source_width - desired_widths[index]
+                add = min(remaining, room)
+                desired_widths[index] += add
+                remaining -= add
+                if remaining <= 0:
+                    break
+
+    final_geometry: List[Tuple[int, int]] = []
+    for index, ((source_width, source_height), ratio) in enumerate(
+        zip(image_dimensions, aspect_ratios)
+    ):
+        width = desired_widths[index]
+        if ratio <= 0 or source_width <= 0 or source_height <= 0:
+            final_geometry.append((source_width, source_height))
+            continue
+        height = min(source_height, max(1, int(width / ratio)))
+        final_geometry.append((width, height))
+
+    return final_geometry
+
+
+def _prepare_mosaic_images(
+    images: Sequence[nodes.image],
+    imgtargetdir: str,
+    mosaic_width: int,
+    border_percent: float,
+) -> List[Tuple[str, float, int, int]]:
+    """Copy and resize mosaic images as needed."""
+    opened_images: List[Tuple[nodes.image, Any]] = []
+    image_dimensions: List[Tuple[int, int]] = []
+    for image in images:
+        img = PIL.Image.open(image['uri'])
+        opened_images.append((image, img))
+        image_dimensions.append((img.width, img.height))
+
+    geometry = _calculate_mosaic_image_geometry(
+        image_dimensions,
+        mosaic_width,
+        border_percent,
+    )
+
+    image_entries: List[Tuple[str, float, int, int]] = []
+    for (image, img), (target_width, target_height) in zip(opened_images, geometry):
+        ratio = img.width / img.height if img.height else 0
+        newuri = join(imgtargetdir, basename(image['uri']))
+
+        newwidth = img.width
+        newheight = img.height
+        if img.width and img.height and target_width > 0 and target_height > 0:
+            width = min(target_width, img.width)
+            height = min(target_height, img.height)
+            if ratio:
+                height = min(height, max(1, int(width / ratio)))
+                width = min(width, max(1, int(height * ratio)))
+            if width != img.width or height != img.height:
+                img = img.resize((width, height), resample=PIL.Image.LANCZOS)
+                newwidth = width
+                newheight = height
+
+        img.save(newuri)
+        image['uri'] = newuri
+        image_entries.append((newuri, ratio, newwidth, newheight))
+
+    return image_entries
 
 
 def _prepare_mosaic_image(
@@ -122,26 +269,40 @@ def _prepare_mosaic_image(
     imgtargetdir: str,
     max_width: int,
 ) -> Tuple[str, float]:
-    """Copy and resize mosaic images as needed."""
+    """Copy one mosaic image and cap width to preserve legacy behavior."""
     img = PIL.Image.open(image['uri'])
     ratio = img.width / img.height if img.height else 0
     newuri = join(imgtargetdir, basename(image['uri']))
     if img.width > max_width and img.height:
-        newwidth = max_width
-        newheight = int(newwidth / ratio) if ratio else img.height
-        img = img.resize((newwidth, newheight), resample=PIL.Image.LANCZOS)
+        newheight = int(max_width / ratio) if ratio else img.height
+        img = img.resize((max_width, newheight), resample=PIL.Image.LANCZOS)
     img.save(newuri)
     image['uri'] = newuri
     return newuri, ratio
 
 
-def _render_mosaic_images(image_entries: Sequence[Tuple[str, float]]) -> str:
+def _render_mosaic_images(
+    image_entries: Sequence[Tuple[str, float, int, int] | Tuple[str, float]],
+) -> str:
     """Render mosaic image HTML snippets."""
     lines = []
-    for newuri, ratio in image_entries:
+    for entry in image_entries:
+        if len(entry) == 2:
+            newuri, ratio = entry
+            lines.append(
+                '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
+                    newuri,
+                    ratio,
+                )
+            )
+            continue
+
+        newuri, ratio, width, height = entry
         lines.append(
-            '    <img src="{0}" style="--ar: {1:.4f};">\n'.format(
+            '    <img src="{0}" width="{1}" height="{2}" style="--ar: {3:.4f};">\n'.format(
                 newuri,
+                width,
+                height,
                 ratio,
             )
         )
@@ -349,15 +510,12 @@ class ModifiedHTMLTranslator(HTMLTranslator):
             border_percent = _parse_mosaic_border(mosaic_border, width)
 
             images = [child for child in node if isinstance(child, nodes.image)]
-            image_entries: List[Tuple[str, float]] = []
-            max_width = MOSAIC_MAX_WIDTH
-            for image in images:
-                newuri, ratio = _prepare_mosaic_image(
-                    image,
-                    self.settings.imgtargetdir,
-                    max_width,
-                )
-                image_entries.append((newuri, ratio))
+            image_entries = _prepare_mosaic_images(
+                images,
+                self.settings.imgtargetdir,
+                width,
+                border_percent,
+            )
 
             self.body.append('<div class="mosaic">\n')
             self.body.append(_render_mosaic_images(image_entries))
@@ -394,9 +552,9 @@ class ModifiedHTMLTranslator(HTMLTranslator):
         newuri = join(self.settings.imgtargetdir, basename(uri))
         node['uri'] = newuri
 
-        if type(self.settings.targetlinewidth) != int:
+        if type(self.settings.targetlinewidth) != int or self.settings.targetlinewidth <= 0:
             raise TypeError(
-                'You need to specify an integer for --targetlinewidth'
+                'You need to specify a positive integer for --targetlinewidth'
             )
 
         tlw = self.settings.targetlinewidth

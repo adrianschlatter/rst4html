@@ -497,7 +497,7 @@ def test_modified_translator_mosaic_resizes_large_images(
     translator_factory: Callable[..., core.ModifiedHTMLTranslator],
     mosaic_row_factory: Callable[..., nodes.container],
 ) -> None:
-    """Resize mosaic images that exceed the max width."""
+    """Resize mosaic images to computed width from target linewidth."""
     translator = translator_factory(tmp_path)
     row = mosaic_row_factory(
         tmp_path,
@@ -528,7 +528,7 @@ def test_modified_translator_mosaic_resizes_large_images(
     with pytest.raises(nodes.SkipNode):
         core.ModifiedHTMLTranslator.visit_container(translator, row)
 
-    assert dummy.resize_args == (425, 212)
+    assert dummy.resize_args == (200, 100)
 
 
 def test_modified_translator_mosaic_caption_container(
